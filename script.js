@@ -17,12 +17,12 @@ const boardControl = (() => {
     let cells = ["", "", "", "", "", "", "", "", "",];
 
     function getBoard() {
-        return cells;
+        return [...cells];
     }
 
-    function makeMove(position, player) {
+    function makeMove(position, token) {
         if (cells[position] !== "") return false;
-        cells[position] = player.getToken;
+        cells[position] = token;
         return true;
     }
 
@@ -60,45 +60,44 @@ const gameControl = (() => {
     const players = [player1, player2];
     let activeIndex = 0;
 
-    const dialog = document.querySelector("dialog");
-    const text = document.querySelector(".text");
-    const resetBtn = document.querySelector(".reset-btn");
-
-    resetBtn.addEventListener("click", () => {
-        boardControl.reset();
-        displayControl.render();
-        activeIndex = 0;
-        dialog.close();
-    })
-
     function switchTurns() {
         activeIndex = (activeIndex + 1) % players.length;
     }
 
+    function resetGame() {
+        boardControl.reset();
+        activeIndex = 0;
+    }
+
     function makeTurn(position) {
         const currentPlayer = players[activeIndex];
-        const result = boardControl.makeMove(position, currentPlayer);
-        if (!result) return;
+        const result = boardControl.makeMove(position, currentPlayer.token);
+        if (!result) {
+            return {
+                status: "invalid"
+            }
+        }
 
-        displayControl.render();
-        
         if (boardControl.checkWins(currentPlayer)) {
-            text.textContent = `${currentPlayer.id} wins!`;
-            dialog.showModal();
-            return;
+            return {
+                status: "win",
+                player: currentPlayer.id
+            }
         } else if (boardControl.draws()) {
-            text.textContent = `Draw!`;
-            dialog.showModal();
-            return;
+            return {
+                status: "draw"
+            }
         }
         
         if (result) {
-            boardControl.getBoard();
             switchTurns();
+            return {
+                status: "continue"
+            }
         }
     }
 
-    return { makeTurn }
+    return { makeTurn, resetGame }
 })();
 
 const displayControl = (() => {
@@ -106,6 +105,16 @@ const displayControl = (() => {
     const board = document.createElement("div");
     board.classList.add("board");
     body.appendChild(board);
+
+    const dialog = document.querySelector("dialog");
+    const text = document.querySelector(".text");
+    const resetBtn = document.querySelector(".reset-btn");
+
+    resetBtn.addEventListener("click", () => {
+        gameControl.resetGame();
+        render();
+        dialog.close();
+    })
     
     function render() {
         board.replaceChildren();
@@ -115,7 +124,18 @@ const displayControl = (() => {
             cell.classList.add("cell");
     
             cell.addEventListener("click", () => {
-                gameControl.makeTurn(index);
+                const result = gameControl.makeTurn(index);
+
+                if (result.status === "invalid") return;
+                render();
+
+                if (result.status === "draw") {
+                    text.textContent = "Draw!"
+                    dialog.showModal();
+                } else if (result.status === "win") {
+                    text.textContent = `${result.player} wins!`;
+                    dialog.showModal();
+                }
             })
     
             board.appendChild(cell);
